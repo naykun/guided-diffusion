@@ -7,7 +7,6 @@ from .unet import SuperResModel, UNetModel, EncoderUNetModel
 
 NUM_CLASSES = 1000
 
-
 def diffusion_defaults():
     """
     Defaults for image and classifier training.
@@ -60,6 +59,7 @@ def model_and_diffusion_defaults():
         resblock_updown=False,
         use_fp16=False,
         use_new_attention_order=False,
+        emb_condition=False,
     )
     res.update(diffusion_defaults())
     return res
@@ -95,6 +95,7 @@ def create_model_and_diffusion(
     resblock_updown,
     use_fp16,
     use_new_attention_order,
+    emb_condition=False,
 ):
     model = create_model(
         image_size,
@@ -113,6 +114,7 @@ def create_model_and_diffusion(
         resblock_updown=resblock_updown,
         use_fp16=use_fp16,
         use_new_attention_order=use_new_attention_order,
+        emb_condition=emb_condition,
     )
     diffusion = create_gaussian_diffusion(
         steps=diffusion_steps,
@@ -144,6 +146,7 @@ def create_model(
     resblock_updown=False,
     use_fp16=False,
     use_new_attention_order=False,
+    emb_condition=False,
 ):
     if channel_mult == "":
         if image_size == 512:
@@ -153,6 +156,8 @@ def create_model(
         elif image_size == 128:
             channel_mult = (1, 1, 2, 3, 4)
         elif image_size == 64:
+            channel_mult = (1, 2, 3, 4)
+        elif image_size == 32:
             channel_mult = (1, 2, 3, 4)
         else:
             raise ValueError(f"unsupported image size: {image_size}")
@@ -181,6 +186,7 @@ def create_model(
         use_scale_shift_norm=use_scale_shift_norm,
         resblock_updown=resblock_updown,
         use_new_attention_order=use_new_attention_order,
+        emb_condition=emb_condition,
     )
 
 
@@ -355,6 +361,8 @@ def sr_create_model(
     elif large_size == 256:
         channel_mult = (1, 1, 2, 2, 4, 4)
     elif large_size == 64:
+        channel_mult = (1, 2, 3, 4)
+    elif large_size == 32:
         channel_mult = (1, 2, 3, 4)
     else:
         raise ValueError(f"unsupported large size: {large_size}")

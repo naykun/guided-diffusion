@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 import torch as th
-import torch.nn as nn
+from torch import nn, einsum
 import torch.nn.functional as F
 
 from .fp16_util import convert_module_to_f16, convert_module_to_f32
@@ -138,7 +138,6 @@ class Downsample(nn.Module):
     def forward(self, x):
         assert x.shape[1] == self.channels
         return self.op(x)
-
 
 class ResBlock(TimestepBlock):
     """
@@ -445,6 +444,7 @@ class UNetModel(nn.Module):
         use_scale_shift_norm=False,
         resblock_updown=False,
         use_new_attention_order=False,
+        emb_condition=False,
     ):
         super().__init__()
 
@@ -466,6 +466,7 @@ class UNetModel(nn.Module):
         self.num_heads = num_heads
         self.num_head_channels = num_head_channels
         self.num_heads_upsample = num_heads_upsample
+        self.emb_condition = emb_condition
 
         time_embed_dim = model_channels * 4
         self.time_embed = nn.Sequential(
@@ -485,7 +486,7 @@ class UNetModel(nn.Module):
         input_block_chans = [ch]
         ds = 1
         for level, mult in enumerate(channel_mult):
-            for _ in range(num_res_blocks):
+            for i in range(num_res_blocks):
                 layers = [
                     ResBlock(
                         ch,
@@ -497,7 +498,9 @@ class UNetModel(nn.Module):
                         use_scale_shift_norm=use_scale_shift_norm,
                     )
                 ]
+
                 ch = int(mult * model_channels)
+
                 if ds in attention_resolutions:
                     layers.append(
                         AttentionBlock(
@@ -511,6 +514,7 @@ class UNetModel(nn.Module):
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
                 self._feature_size += ch
                 input_block_chans.append(ch)
+
             if level != len(channel_mult) - 1:
                 out_ch = ch
                 self.input_blocks.append(
@@ -536,37 +540,55 @@ class UNetModel(nn.Module):
                 ds *= 2
                 self._feature_size += ch
 
-        self.middle_block = TimestepEmbedSequential(
+        middle_ch = ch
+
+        if self.emb_condition:
+            self.external_block = Downsample(
+                256, True, out_channels=512
+            )
+            middle_ch = ch+512
+        else:
+            middle_ch = ch
+
+        middle_block = TimestepEmbedSequential(
             ResBlock(
-                ch,
+                middle_ch,
                 time_embed_dim,
                 dropout,
                 dims=dims,
                 use_checkpoint=use_checkpoint,
                 use_scale_shift_norm=use_scale_shift_norm,
-            ),
+                ),
             AttentionBlock(
-                ch,
+                middle_ch,
                 use_checkpoint=use_checkpoint,
                 num_heads=num_heads,
                 num_head_channels=num_head_channels,
                 use_new_attention_order=use_new_attention_order,
-            ),
+                ),
             ResBlock(
-                ch,
+                middle_ch,
                 time_embed_dim,
                 dropout,
                 dims=dims,
                 use_checkpoint=use_checkpoint,
                 use_scale_shift_norm=use_scale_shift_norm,
+                out_channels=ch
             ),
         )
+
+        if self.emb_condition:
+            self.middle_block_cond = middle_block
+        else:
+            self.middle_block = middle_block
+
         self._feature_size += ch
 
         self.output_blocks = nn.ModuleList([])
         for level, mult in list(enumerate(channel_mult))[::-1]:
             for i in range(num_res_blocks + 1):
                 ich = input_block_chans.pop()
+
                 layers = [
                     ResBlock(
                         ch + ich,
@@ -620,7 +642,13 @@ class UNetModel(nn.Module):
         Convert the torso of the model to float16.
         """
         self.input_blocks.apply(convert_module_to_f16)
-        self.middle_block.apply(convert_module_to_f16)
+
+        if self.emb_condition:
+            self.middle_block_cond.apply(convert_module_to_f16)
+            self.external_block.apply(convert_module_to_f16)
+        else:
+            self.middle_block.apply(convert_module_to_f16)
+
         self.output_blocks.apply(convert_module_to_f16)
 
     def convert_to_fp32(self):
@@ -628,10 +656,15 @@ class UNetModel(nn.Module):
         Convert the torso of the model to float32.
         """
         self.input_blocks.apply(convert_module_to_f32)
-        self.middle_block.apply(convert_module_to_f32)
+
+        if self.emb_condition:
+            self.middle_block_cond.apply(convert_module_to_f32)
+            self.external_block.apply(convert_module_to_f32)
+        else:
+            self.middle_block.apply(convert_module_to_f32)
         self.output_blocks.apply(convert_module_to_f32)
 
-    def forward(self, x, timesteps, y=None):
+    def forward(self, x, timesteps, y=None, image_embeds=None):
         """
         Apply the model to an input batch.
 
@@ -648,17 +681,28 @@ class UNetModel(nn.Module):
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
 
         if self.num_classes is not None:
-            assert y.shape == (x.shape[0],)
+            assert y.shape[0] == x.shape[0] and y.shape[1] == 512
             emb = emb + self.label_emb(y)
 
         h = x.type(self.dtype)
+
         for module in self.input_blocks:
             h = module(h, emb)
             hs.append(h)
-        h = self.middle_block(h, emb)
+
+        if image_embeds is not None:
+            im = image_embeds.type(self.dtype)
+            im = self.external_block(im)
+            h = th.cat([h, im], dim=1)
+
+            h = self.middle_block_cond(h, emb)
+        else:
+            h = self.middle_block(h, emb)
+
         for module in self.output_blocks:
             h = th.cat([h, hs.pop()], dim=1)
             h = module(h, emb)
+
         h = h.type(x.dtype)
         return self.out(h)
 

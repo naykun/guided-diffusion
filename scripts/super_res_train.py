@@ -32,6 +32,7 @@ def main():
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating data loader...")
+
     data = load_superres_data(
         args.data_dir,
         args.batch_size,
@@ -57,6 +58,7 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
+        lr_warmup_steps=args.lr_warmup_steps,
     ).run_loop()
 
 
@@ -79,6 +81,7 @@ def create_argparser():
         lr=1e-4,
         weight_decay=0.0,
         lr_anneal_steps=0,
+        lr_warmup_steps=0,
         batch_size=1,
         microbatch=-1,
         ema_rate="0.9999",

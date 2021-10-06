@@ -17,6 +17,7 @@ def load_data(
     deterministic=False,
     random_crop=False,
     random_flip=True,
+    emb_condition=False,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -35,6 +36,7 @@ def load_data(
     :param deterministic: if True, yield results in a deterministic order.
     :param random_crop: if True, randomly crop the images for augmentation.
     :param random_flip: if True, randomly flip the images for augmentation.
+    :param emb_condition: if True, add an "image_128" param to model_kwargs. (the target resolution may be smaller than 128, in which case we can't get the 128px image by downscaling)
     """
     if not data_dir:
         raise ValueError("unspecified data directory")
@@ -54,6 +56,7 @@ def load_data(
         num_shards=MPI.COMM_WORLD.Get_size(),
         random_crop=random_crop,
         random_flip=random_flip,
+        emb_condition=emb_condition,
     )
     if deterministic:
         loader = DataLoader(
@@ -89,6 +92,7 @@ class ImageDataset(Dataset):
         num_shards=1,
         random_crop=False,
         random_flip=True,
+        emb_condition=False,
     ):
         super().__init__()
         self.resolution = resolution
@@ -96,6 +100,7 @@ class ImageDataset(Dataset):
         self.local_classes = None if classes is None else classes[shard:][::num_shards]
         self.random_crop = random_crop
         self.random_flip = random_flip
+        self.emb_condition = emb_condition
 
     def __len__(self):
         return len(self.local_images)
@@ -120,7 +125,14 @@ class ImageDataset(Dataset):
         out_dict = {}
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
-        return np.transpose(arr, [2, 0, 1]), out_dict
+
+        arr = np.transpose(arr, [2, 0, 1])
+
+        if self.emb_condition:
+            arr_128 = F.interpolate(arr.unsqueeze(0), 128, mode="area")
+            out_dict["image_128"] = arr_128.squeeze(0)
+
+        return arr, out_dict
 
 
 def center_crop_arr(pil_image, image_size):

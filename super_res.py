@@ -3,7 +3,6 @@ import io
 import math
 import sys
 
-from IPython import display
 import lpips
 from PIL import Image
 import requests

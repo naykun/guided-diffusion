@@ -30,8 +30,8 @@ Each of these diffusion models have been fine-tuned from the corresponding model
 
  * 64x64 GumbelVQ: [model064000.pt](https://dall-3.com/models/guided-diffusion/64/)
  * 128x128 GumbelVQ: [model072000.pt](https://dall-3.com/models/guided-diffusion/128/)
- * 256x256 GumbelVQ: [model021500.pt](https://dall-3.com/models/guided-diffusion/256/)
- * 64x64 -&gt; 256x256 upsampler: [model010000.pt](https://dall-3.com/models/guided-diffusion/64_256/)
+ * 256x256 GumbelVQ: [model054000.pt](https://dall-3.com/models/guided-diffusion/256/)
+ * 64x64 -&gt; 256x256 upsampler: [model016000.pt](https://dall-3.com/models/guided-diffusion/64_256/)
 
 Experimental models
  * 128x128 DVAE encoder : [model009000.pt](https://dall-3.com/models/guided-diffusion/128dvae/)
@@ -39,7 +39,7 @@ Experimental models
 
 # Installation
 
-You will need to install [CLIP](https://github.com/openai/CLIP), [VQGAN](https://github.com/CompVis/taming-transformers), and [DALLE-pytorch](https://github.com/lucidrains/DALLE-pytorch/)
+You will need to install [CLIP](https://github.com/openai/CLIP) and [DALLE-pytorch](https://github.com/lucidrains/DALLE-pytorch/)
 
 then clone this repository and
 ```

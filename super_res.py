@@ -26,7 +26,7 @@ model_path = './models/model012000.pt'
 prompts = ['your prompt here']
 image_prompts = []
 batch_size = 1
-clip_guidance = True        # Set to False for no clip guidance
+clip_guidance = False       # Clip guidance typically does not have much effect for the super resolution model
 clip_guidance_scale = 1000  # Controls how much the image should look like the prompt.
 tv_scale = 0                # Controls the smoothness of the final output
 range_scale = 0             # Controls how far out of range RGB values are allowed to be
@@ -185,9 +185,10 @@ def do_run():
         bottom = (height + new_height)/2
         init = init.crop((left, top, right, bottom))
 
-        init = init.resize((64, 64), Image.LANCZOS)
+    init_tensor = transforms.ToTensor()(init).unsqueeze(0)
+    init_tensor = F.interpolate(init_tensor, size=64, mode='area') # this specific downscaling method was used during training and is necessary for best results
+    init_tensor = init_tensor.to(device).mul(2).sub(1).clamp(-1,1)
 
-    init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device).mul(2).sub(1).clamp(-1,1)
     init_tensor = init_tensor.repeat(batch_size, 1, 1, 1)
 
     cur_t = None

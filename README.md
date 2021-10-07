@@ -2,7 +2,7 @@
 
 This project is based on Clip-Guided Diffusion by [RiversHaveWings](https://twitter.com/RiversHaveWings)
 
-It's ultimately meant for image generation via [DALLE-pytorch](https://github.com/lucidrains/DALLE-pytorch/) by replacing the VAE decoder with a diffusion model. By itself, the diffusion model can perform text-guided image-to-image translation. In this application the overall structure of the original image is preserved, while the details are re-generated with clip guidance. This repository also contains a separate model for clip-guided super-resolution from 64x64 to 256x256
+This diffusion model is ultimately meant for image generation via [DALLE-pytorch](https://github.com/lucidrains/DALLE-pytorch/) by replacing the VAE decoder. By itself, it can perform text-guided image-to-image translation. In this application the overall structure of the original image is preserved, while the details are re-generated with clip guidance. This repository also contains a separate model for clip-guided super-resolution from 64x64 to 256x256
 
 # Sample generations
 
@@ -18,10 +18,11 @@ reconstruction from 256x16x16 latents (best out of 8)
 
 superresolution from 64x64 to 256x256
 
-| Ground truth | 64x64 | Upscaled seed 0 | Upscaled seed 1 | Upscaled seed 2 |
-| <img src="./images/1-ground.png"></img> | <img src="./images/1-64x64.png"></img> | <img src="./images/1-upscaled-1.png"></img> | <img src="./images/1-upscaled-2.png"></img> | <img src="./images/1-upscaled-3.png"></img> |
-| <img src="./images/2-ground.png"></img> | <img src="./images/2-64x64.png"></img> | <img src="./images/2-upscaled-1.png"></img> | <img src="./images/2-upscaled-2.png"></img> | <img src="./images/2-upscaled-3.png"></img> |
-| <img src="./images/3-ground.png"></img> | <img src="./images/3-64x64.png"></img> | <img src="./images/3-upscaled-1.png"></img> | <img src="./images/3-upscaled-2.png"></img> | <img src="./images/3-upscaled-3.png"></img> |
+| Ground truth | 64x64 | Upscaled |
+| --- | --- | --- |
+| <img src="./images/1-ground.png"></img> | <img src="./images/1-64x64.png"></img> | <img src="./images/1-upscaled.png"></img> |
+| <img src="./images/2-ground.png"></img> | <img src="./images/2-64x64.png"></img> | <img src="./images/2-upscaled.png"></img> |
+| <img src="./images/3-ground.png"></img> | <img src="./images/3-64x64.png"></img> | <img src="./images/3-upscaled.png"></img> |
 
 # Download pre-trained models
 
@@ -53,10 +54,10 @@ To sample from these models, you can use the `sample.py`, and `super_res.py` scr
 mkdir -p models/vqgan_gumbel_f8/configs && wget 'https://heibox.uni-heidelberg.de/f/b24d14998a8d4f19a34f/?dl=1' -O 'models/vqgan_gumbel_f8/configs/model.yaml' 
 mkdir -p models/vqgan_gumbel_f8/checkpoints && wget 'https://heibox.uni-heidelberg.de/f/34a747d5765840b5a99d/?dl=1' -O 'models/vqgan_gumbel_f8/checkpoints/last.ckpt' 
 
-# for the 128x128 dvae model
+# (optional) for the 128x128 dvae model
 mkdir -p models/dvae/ && wget 'https://dall-3.com/models/dvae/vae-final-128-8192.pt' -O 'models/dvae/vae-final-128-8192.pt' 
 
-# for the 64x64 classifier model
+# (optional) for the 64x64 classifier model
 mkdir -p models/dvae/ && wget 'https://dall-3.com/models/dvae/vae-classifier.pt' -O 'models/dvae/vae-classifier.pt' 
 
 # download the appropriate diffusion model and put in ./models/

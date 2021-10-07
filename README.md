@@ -32,6 +32,8 @@ Each of these diffusion models have been fine-tuned from the corresponding model
  * 128x128 GumbelVQ: [model072000.pt](https://dall-3.com/models/guided-diffusion/128/)
  * 256x256 GumbelVQ: [model021500.pt](https://dall-3.com/models/guided-diffusion/256/)
  * 64x64 -&gt; 256x256 upsampler: [model010000.pt](https://dall-3.com/models/guided-diffusion/64_256/)
+
+Experimental models
  * 128x128 DVAE encoder : [model009000.pt](https://dall-3.com/models/guided-diffusion/128dvae/)
  * 64x64 DVAE Classifier encoder : [model022000.pt](https://dall-3.com/models/guided-diffusion/64dvae/)
 
@@ -111,11 +113,6 @@ export OPENAI_LOGDIR=./64_256_logs/
 mpiexec -n 4 python scripts/super_res_train.py --data_dir ./path/to/data/ $MODEL_FLAGS $TRAIN_FLAGS
 ```
 
- * 128x128 dvae model:
+for the dvae models it's the same as above, except use scripts/image_dvae_train.py
 
-```
-MODEL_FLAGS="--attention_resolutions 32,16,8 --emb_condition True --class_cond False --diffusion_steps 1000 --image_size 128 --learn_sigma True --noise_schedule linear --num_channels 256 --num_heads 4 --num_res_blocks 2 --resblock_updown True --use_fp16 True --use_scale_shift_norm True"
-TRAIN_FLAGS="--lr 1e-4 --lr_warmup_steps 1000 --lr_warmup_steps 1000 --batch_size 66 --microbatch 11 --log_interval 1 --save_interval 1000 --resume_checkpoint models/128x128_diffusion.pt"
-export OPENAI_LOGDIR=./128_dvae_logs/
-mpiexec -n 4 python scripts/image_dvae_train.py --data_dir ./path/to/data/ $MODEL_FLAGS $TRAIN_FLAGS
-```
+to resume training the models in this repo, use --resume_checkpoint OPENAI_LOGDIR/modelXXX.pt (the current step, optimizer and ema checkpoints are inferred from the filename)

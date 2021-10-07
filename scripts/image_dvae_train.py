@@ -32,7 +32,7 @@ def main():
 
     logger.log("setting up DALLE-pytorch dvae...")
 
-    loaded_obj = torch.load('./models/dvae/vae-classifier-128-8192.pt')
+    loaded_obj = torch.load('./models/dvae/vae-classifier.pt')
 
     vae_params, vae_weights = loaded_obj['hparams'], loaded_obj['weights']
 

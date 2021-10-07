@@ -7,6 +7,8 @@ from mpi4py import MPI
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
+import torch
+from torch.nn import functional as F
 
 def load_data(
     *,
@@ -129,7 +131,7 @@ class ImageDataset(Dataset):
         arr = np.transpose(arr, [2, 0, 1])
 
         if self.emb_condition:
-            arr_128 = F.interpolate(arr.unsqueeze(0), 128, mode="area")
+            arr_128 = F.interpolate(torch.from_numpy(arr).unsqueeze(0), 128, mode="area")
             out_dict["image_128"] = arr_128.squeeze(0)
 
         return arr, out_dict

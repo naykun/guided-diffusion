@@ -31,7 +31,7 @@ def main():
 
     logger.log("setting up gumbel f8 vae...")
 
-    vae = VQGanVAE('./models/vqgan_gumbel_f8_8192/ckpts/last.ckpt', './models/vqgan_gumbel_f8_8192/configs/model.yaml')
+    vae = VQGanVAE('./models/vqgan_gumbel_f8/checkpoints/last.ckpt', './models/vqgan_gumbel_f8/configs/model.yaml')
     vae = vae.to(dist_util.dev())
     set_requires_grad(vae, False)
 

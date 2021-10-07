@@ -8,17 +8,20 @@ It's ultimately meant for image generation via [DALLE-pytorch](https://github.co
 
 images from Unsplash
 
-reconstruction from 256x16x16 latents
+reconstruction from 256x16x16 latents (best out of 8)
 
 | Ground truth | GumbelVQ f8 | CCGD without clip | CCGD + clip | CCGD + clip | CCGD + clip |
 | --- | --- | --- | --- | --- | --- |
 | <img src="./images/1-ground.png"></img> | <img src="./images/1-gumbel.png"></img> | <img src="./images/1-ccgd-noclip.png"></img> | <img src="./images/1-ccgd-clip-1.png"></img><br /><sub>Prompt: a girl</sub> | <img src="./images/1-ccgd-clip-2.png"></img><br /><sub>Prompt: a smiling girl</sub> | <img src="./images/1-ccgd-clip-3.png"></img><br /><sub>Prompt: a girl with glasses</sub> |
 | <img src="./images/2-ground.png"></img> | <img src="./images/2-gumbel.png"></img> | <img src="./images/2-ccgd-noclip.png"></img> | <img src="./images/2-ccgd-clip-1.png"></img><br /><sub>Prompt: a DSLR camera</sub> | <img src="./images/2-ccgd-clip-2.png"></img><br /><sub>Prompt: a Canon DSLR camera</sub> | <img src="./images/2-ccgd-clip-3.png"></img><br /><sub>Prompt: a Nikon DSLR camera </sub> |
+| <img src="./images/3-ground.png"></img> | <img src="./images/3-gumbel.png"></img> | <img src="./images/3-ccgd-noclip.png"></img> | <img src="./images/3-ccgd-clip-1.png"></img><br /><sub>Prompt: a cute dog</sub> | <img src="./images/3-ccgd-clip-2.png"></img><br /><sub>Prompt: a vicious wolf</sub> | <img src="./images/3-ccgd-clip-3.png"></img><br /><sub>Prompt: a cat </sub> |
 
 superresolution from 64x64 to 256x256
 
-| Ground truth | 64x64 | Upscaled |
-| <img src="./images/1-ground.png"></img> | <img src="./images/1-64x64.png"></img> | <img src="./images/1-upscaled.png"></img> |
+| Ground truth | 64x64 | Upscaled seed 0 | Upscaled seed 1 | Upscaled seed 2 |
+| <img src="./images/1-ground.png"></img> | <img src="./images/1-64x64.png"></img> | <img src="./images/1-upscaled-1.png"></img> | <img src="./images/1-upscaled-2.png"></img> | <img src="./images/1-upscaled-3.png"></img> |
+| <img src="./images/2-ground.png"></img> | <img src="./images/2-64x64.png"></img> | <img src="./images/2-upscaled-1.png"></img> | <img src="./images/2-upscaled-2.png"></img> | <img src="./images/2-upscaled-3.png"></img> |
+| <img src="./images/3-ground.png"></img> | <img src="./images/3-64x64.png"></img> | <img src="./images/3-upscaled-1.png"></img> | <img src="./images/3-upscaled-2.png"></img> | <img src="./images/3-upscaled-3.png"></img> |
 
 # Download pre-trained models
 
@@ -27,12 +30,12 @@ Each of these models have been fine-tuned from the corresponding guided diffusio
  * 64x64 GumbelVQ: [model064000.pt](https://dall-3.com/models/guided-diffusion/64/)
  * 128x128 GumbelVQ: [model072000.pt](https://dall-3.com/models/guided-diffusion/128/)
  * 256x256 GumbelVQ: [model021500.pt](https://dall-3.com/models/guided-diffusion/256/)
- * 64x64 -> 256x256 upsampler: [model010000.pt](https://dall-3.com/models/guided-diffusion/64_256/)
+ * 64x64 -&gt; 256x256 upsampler: [model010000.pt](https://dall-3.com/models/guided-diffusion/64_256/)
  * 128x128 DVAE: [model009000.pt](https://dall-3.com/models/guided-diffusion/128dvae/)
 
 # Installation
 
-You will need to install [clip](https://github.com/openai/CLIP), [VQGAN](https://github.com/CompVis/taming-transformers), and [DALLE-pytorch](https://github.com/lucidrains/DALLE-pytorch/)
+You will need to install [CLIP](https://github.com/openai/CLIP), [VQGAN](https://github.com/CompVis/taming-transformers), and [DALLE-pytorch](https://github.com/lucidrains/DALLE-pytorch/)
 
 then clone this repository and
 ```
@@ -54,4 +57,56 @@ python sample.py --init init.jpg --image_size 64 --checkpoint models/model064000
 
 # sample with a DVAE encoder instead of GumbelVQ
 python sample.py --mode dvae --init init.jpg --image_size 128 --checkpoint models/model009000.pt --batch_size 4"
+```
+
+# Training
+
+You can use the original OpenAI models to train from scratch, or continue training from the models in this repo by putting the modelXXX, emaXXX and optXXX files in the OPENAI_LOGDIR directory
+
+note the new flags --emb_condition and --lr_warmup_steps
+
+
+ * 64x64 model:
+
+```
+MODEL_FLAGS="--attention_resolutions 32,16,8 --emb_condition True --class_cond False --diffusion_steps 1000 --dropout 0.1 --image_size 64 --learn_sigma True --noise_schedule cosine --num_channels 192 --num_head_channels 64 --num_res_blocks 3 --resblock_updown True --use_new_attention_order True --use_fp16 True --use_scale_shift_norm True"
+TRAIN_FLAGS="--lr 1e-4 --lr_warmup_steps 1000 --batch_size 70 --microbatch 35 --log_interval 1 --save_interval 2000 --resume_checkpoint models/64x64_diffusion.pt"
+export OPENAI_LOGDIR=./64_logs/
+mpiexec -n 4 python scripts/image_gumbel_train.py --data_dir ./path/to/data/ $MODEL_FLAGS $TRAIN_FLAGS
+```
+
+ * 128x128 model:
+
+```
+MODEL_FLAGS="--attention_resolutions 32,16,8 --emb_condition True --class_cond False --diffusion_steps 1000 --image_size 128 --learn_sigma True --noise_schedule linear --num_channels 256 --num_heads 4 --num_res_blocks 2 --resblock_updown True --use_fp16 True --use_scale_shift_norm True"
+TRAIN_FLAGS="--lr 1e-4 --lr_warmup_steps 1000 --lr_warmup_steps 1000 --batch_size 66 --microbatch 11 --log_interval 1 --save_interval 1000 --resume_checkpoint models/128x128_diffusion.pt"
+export OPENAI_LOGDIR=./128_logs/
+mpiexec -n 4 python scripts/image_gumbel_train.py --data_dir ./path/to/data/ $MODEL_FLAGS $TRAIN_FLAGS
+```
+
+ * 256x256 model:
+
+```
+MODEL_FLAGS="--attention_resolutions 32,16,8 --emb_condition True --class_cond False --diffusion_steps 1000 --image_size 256 --learn_sigma True --noise_schedule linear --num_channels 256 --num_head_channels 64 --num_res_blocks 2 --resblock_updown True --use_fp16 True --use_scale_shift_norm True"
+TRAIN_FLAGS="--lr 1e-4 --lr_warmup_steps 1000 --batch_size 64 --microbatch 4 --log_interval 1 --save_interval 500 --resume_checkpoint models/256x256_diffusion_uncond.pt"
+export OPENAI_LOGDIR=./256_logs/
+mpiexec -n 4 python scripts/image_gumbel_train.py --data_dir ./path/to/data/ $MODEL_FLAGS $TRAIN_FLAGS
+```
+
+ * 64x64 -&gt; 256x256 model:
+
+```
+MODEL_FLAGS="--attention_resolutions 32,16,8 --class_cond False --diffusion_steps 1000 --large_size 256  --small_size 64 --learn_sigma True --noise_schedule linear --num_channels 192 --num_heads 4 --num_res_blocks 2 --resblock_updown True --use_fp16 True --use_scale_shift_norm True"
+TRAIN_FLAGS="--lr 1e-4 --lr_warmup_steps 1000 --batch_size 64 --microbatch 4 --log_interval 1 --save_interval 1000 --resume_checkpoint models/64_256_upsampler.pt"
+export OPENAI_LOGDIR=./64_256_logs/
+mpiexec -n 4 python scripts/super_res_train.py --data_dir ./path/to/data/ $MODEL_FLAGS $TRAIN_FLAGS
+```
+
+ * 128x128 dvae model:
+
+```
+MODEL_FLAGS="--attention_resolutions 32,16,8 --emb_condition True --class_cond False --diffusion_steps 1000 --image_size 128 --learn_sigma True --noise_schedule linear --num_channels 256 --num_heads 4 --num_res_blocks 2 --resblock_updown True --use_fp16 True --use_scale_shift_norm True"
+TRAIN_FLAGS="--lr 1e-4 --lr_warmup_steps 1000 --lr_warmup_steps 1000 --batch_size 66 --microbatch 11 --log_interval 1 --save_interval 1000 --resume_checkpoint models/128x128_diffusion.pt"
+export OPENAI_LOGDIR=./128_dvae_logs/
+mpiexec -n 4 python scripts/image_dvae_train.py --data_dir ./path/to/data/ $MODEL_FLAGS $TRAIN_FLAGS
 ```

@@ -25,13 +25,14 @@ superresolution from 64x64 to 256x256
 
 # Download pre-trained models
 
-Each of these models have been fine-tuned from the corresponding guided diffusion model released by OpenAI. I've also included the EMA and optimizer files for further training.
+Each of these diffusion models have been fine-tuned from the corresponding model released by OpenAI. I've also included the EMA and optimizer files for further training.
 
  * 64x64 GumbelVQ: [model064000.pt](https://dall-3.com/models/guided-diffusion/64/)
  * 128x128 GumbelVQ: [model072000.pt](https://dall-3.com/models/guided-diffusion/128/)
  * 256x256 GumbelVQ: [model021500.pt](https://dall-3.com/models/guided-diffusion/256/)
  * 64x64 -&gt; 256x256 upsampler: [model010000.pt](https://dall-3.com/models/guided-diffusion/64_256/)
- * 128x128 DVAE: [model009000.pt](https://dall-3.com/models/guided-diffusion/128dvae/)
+ * 128x128 DVAE encoder : [model009000.pt](https://dall-3.com/models/guided-diffusion/128dvae/)
+ * 64x64 DVAE Classifier encoder : [model022000.pt](https://dall-3.com/models/guided-diffusion/64dvae/)
 
 # Installation
 
@@ -49,14 +50,21 @@ To sample from these models, you can use the `sample.py`, and `super_res.py` scr
 
 ```
 # first download the GumbelVQ model
-wget 'https://heibox.uni-heidelberg.de/f/b24d14998a8d4f19a34f/?dl=1' -O 'models/vqgan_gumbel_f8/configs/model.yaml' 
-wget 'https://heibox.uni-heidelberg.de/f/34a747d5765840b5a99d/?dl=1' -O 'models/vqgan_gumbel_f8/checkpoints/last.ckpt' 
+mkdir -p models/vqgan_gumbel_f8/configs && wget 'https://heibox.uni-heidelberg.de/f/b24d14998a8d4f19a34f/?dl=1' -O 'models/vqgan_gumbel_f8/configs/model.yaml' 
+mkdir -p models/vqgan_gumbel_f8/checkpoints && wget 'https://heibox.uni-heidelberg.de/f/34a747d5765840b5a99d/?dl=1' -O 'models/vqgan_gumbel_f8/checkpoints/last.ckpt' 
 
+# for the 128x128 dvae model
+mkdir -p models/dvae/ && wget 'https://dall-3.com/models/dvae/vae-final-128-8192.pt' -O 'models/dvae/vae-final-128-8192.pt' 
 
-python sample.py --init init.jpg --image_size 64 --checkpoint models/model064000.pt --batch_size 4"
+# for the 64x64 classifier model
+mkdir -p models/dvae/ && wget 'https://dall-3.com/models/dvae/vae-classifier.pt' -O 'models/dvae/vae-classifier.pt' 
 
-# sample with a DVAE encoder instead of GumbelVQ
-python sample.py --mode dvae --init init.jpg --image_size 128 --checkpoint models/model009000.pt --batch_size 4"
+# download the appropriate diffusion model and put in ./models/
+
+# edit configs in sample.py or super_res.py
+
+python sample.py
+python super_res.py
 ```
 
 # Training

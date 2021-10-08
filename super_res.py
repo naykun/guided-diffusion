@@ -232,7 +232,7 @@ def do_run():
 
         for j, sample in enumerate(samples):
             cur_t -= 1
-            if j % 50 == 0 or cur_t == -1:
+            if j % 50 == 0 or cur_t == -1 or j > stop_at:
                 for k, image in enumerate(sample['pred_xstart']):
                     filename = f'progress_{i * batch_size + k:05}.png'
                     pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))

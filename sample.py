@@ -237,7 +237,9 @@ def do_run():
     width, height = init.size   # Get dimensions
 
     # crop square
-    if width != 128 or height != 128:
+    if width == 128 and height == 128:
+        init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
+    else:
         if width > height:
             new_width = height
             new_height = height
@@ -250,9 +252,9 @@ def do_run():
         bottom = (height + new_height)/2
         init = init.crop((left, top, right, bottom))
 
-        init = init.resize((128, 128), Image.LANCZOS)
-
-    init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
+        init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
+        init_tensor = F.interpolate(init_tensor, size=128, mode='area')
+        
 
     if dvae_mode:
         img_seq = vae.get_codebook_indices(init_tensor)
@@ -308,7 +310,7 @@ def do_run():
         for j, sample in enumerate(samples):
             cur_t -= 1
 
-            if j % 50 == 0 or cur_t == -1:
+            if j % 50 == 0 or cur_t == -1 or j > stop_at:
                 for k, image in enumerate(sample['pred_xstart']):
                     filename = f'progress_{i * batch_size + k:05}.png'
                     pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))

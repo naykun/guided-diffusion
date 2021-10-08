@@ -12,9 +12,12 @@ reconstruction from 256x16x16 latents (best out of 8)
 
 | Ground truth | GumbelVQ f8 | CCGD without clip | CCGD + clip | CCGD + clip | CCGD + clip |
 | --- | --- | --- | --- | --- | --- |
-| <img src="./images/1-ground.png"></img> | <img src="./images/1-gumbel.png"></img> | <img src="./images/1-ccgd-noclip.png"></img> | <img src="./images/1-ccgd-clip-1.png"></img><br /><sub>Prompt: a girl</sub> | <img src="./images/1-ccgd-clip-2.png"></img><br /><sub>Prompt: a smiling girl</sub> | <img src="./images/1-ccgd-clip-3.png"></img><br /><sub>Prompt: a girl with blonde hair</sub> |
-| <img src="./images/2-ground.png"></img> | <img src="./images/2-gumbel.png"></img> | <img src="./images/2-ccgd-noclip.png"></img> | <img src="./images/2-ccgd-clip-1.png"></img><br /><sub>Prompt: a DSLR camera</sub> | <img src="./images/2-ccgd-clip-2.png"></img><br /><sub>Prompt: a Canon DSLR camera</sub> | <img src="./images/2-ccgd-clip-3.png"></img><br /><sub>Prompt: a Nikon DSLR camera </sub> |
-| <img src="./images/3-ground.png"></img> | <img src="./images/3-gumbel.png"></img> | <img src="./images/3-ccgd-noclip.png"></img> | <img src="./images/3-ccgd-clip-1.png"></img><br /><sub>Prompt: a cute dog</sub> | <img src="./images/3-ccgd-clip-2.png"></img><br /><sub>Prompt: a vicious wolf</sub> | <img src="./images/3-ccgd-clip-3.png"></img><br /><sub>Prompt: a cat </sub> |
+| <img src="./images/1-ground.png"></img> | <img src="./images/1-gumbel.png"></img> | <img src="./images/1-ccgd-noclip.png"></img> | <img src="./images/1-ccgd-clip-1.png"></img> | <img src="./images/1-ccgd-clip-2.png"></img> | <img src="./images/1-ccgd-clip-3.png"></img> |
+| - | - | - | <sub>Prompt: a girl</sub> | <sub>Prompt: a smiling girl</sub> | <sub>Prompt: a girl with blonde hair</sub> |
+| <img src="./images/2-ground.png"></img> | <img src="./images/2-gumbel.png"></img> | <img src="./images/2-ccgd-noclip.png"></img> | <img src="./images/2-ccgd-clip-1.png"></img> | <img src="./images/2-ccgd-clip-2.png"></img> | <img src="./images/2-ccgd-clip-3.png"></img> |
+| - | - | - | <sub>Prompt: a DSLR camera</sub> | <sub>Prompt: a Canon DSLR camera</sub> | <sub>Prompt: a Nikon DSLR camera</sub> |
+| <img src="./images/3-ground.png"></img> | <img src="./images/3-gumbel.png"></img> | <img src="./images/3-ccgd-noclip.png"></img> | <img src="./images/3-ccgd-clip-1.png"></img> | <img src="./images/3-ccgd-clip-2.png"></img> | <img src="./images/3-ccgd-clip-3.png"></img> |
+| - | - | - | <sub>Prompt: a cute dog</sub> | <sub>Prompt: a vicious wolf</sub> | <sub>Prompt: a cat </sub> |
 
 superresolution from 64x64 to 256x256
 

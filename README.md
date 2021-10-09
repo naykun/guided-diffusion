@@ -4,6 +4,8 @@ This project is based on Clip-Guided Diffusion by [RiversHaveWings](https://twit
 
 This diffusion model is ultimately meant for image generation via [DALLE-pytorch](https://github.com/lucidrains/DALLE-pytorch/) by replacing the VAE decoder. By itself, it can perform text-guided image-to-image translation. In this application the overall structure of the original image is preserved, while the details are re-generated with clip guidance. This repository also contains a separate model for clip-guided super-resolution from 64x64 to 256x256
 
+more details at this [github discussion](https://github.com/lucidrains/DALLE-pytorch/discussions/375)
+
 # Sample generations
 
 images from Unsplash

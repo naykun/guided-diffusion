@@ -66,10 +66,10 @@ parser.add_argument('--cutn', type = int, default = 16, required = False,
                     help='Number of cuts')
 
 parser.add_argument('--input', type = str, required = True,
-                    help='an input image or an npy file containing embeddings')
+                    help='an input image or an npy file containing image tokens')
 
 parser.add_argument('--seed', type = int, default=0, required = False,
-                    help='an input image or an npy file containing embeddings')
+                    help='random seed')
 
 parser.add_argument('--stop_at', type = int, default=1000, required = False,
                     help='stopping early can give your images an airbrushed look')

@@ -58,7 +58,7 @@ mkdir -p models/vqgan_gumbel_f8/checkpoints && wget 'https://heibox.uni-heidelbe
 # download latest diffusion model
 wget https://dall-3.com/models/guided-diffusion/256/model-latest.pt -O 'models/model-latest.pt'
 
-# run diffusion (input can be image or npy file - a .npy file should contain the image embeddings)
+# run diffusion (input can be image or npy file - a .npy file should contain the image tokens)
 python sample.py --model_size 256 --input 0.npy --text "your prompt here"
 
 ```

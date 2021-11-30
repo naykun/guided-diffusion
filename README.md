@@ -29,18 +29,12 @@ superresolution from 64x64 to 256x256
 | <img src="./images/2-ground.png"></img> | <img src="./images/2-64x64.png"></img> | <img src="./images/2-upscaled.png"></img> |
 | <img src="./images/3-ground.png"></img> | <img src="./images/3-64x64.png"></img> | <img src="./images/3-upscaled.png"></img> |
 
-# Download pre-trained models
+# Download models
 
-Each of these diffusion models have been fine-tuned from the corresponding model released by OpenAI. I've also included the EMA and optimizer files for further training.
+https://dall-3.com/models/guided-diffusion/256/model-latest.pt
 
- * 64x64 GumbelVQ: [model064000.pt](https://dall-3.com/models/guided-diffusion/64/)
- * 128x128 GumbelVQ: [model072000.pt](https://dall-3.com/models/guided-diffusion/128/)
- * 256x256 GumbelVQ: [model054000.pt](https://dall-3.com/models/guided-diffusion/256/)
- * 64x64 -&gt; 256x256 upsampler: [model016000.pt](https://dall-3.com/models/guided-diffusion/64_256/)
-
-Experimental models
- * 128x128 DVAE encoder : [model009000.pt](https://dall-3.com/models/guided-diffusion/128dvae/)
- * 64x64 DVAE Classifier encoder : [model022000.pt](https://dall-3.com/models/guided-diffusion/64dvae/)
+Super-resolution, and other experimental files:
+https://dall-3.com/models/guided-diffusion/
 
 # Installation
 
@@ -61,18 +55,12 @@ To sample from these models, you can use the `sample.py`, and `super_res.py` scr
 mkdir -p models/vqgan_gumbel_f8/configs && wget 'https://heibox.uni-heidelberg.de/f/b24d14998a8d4f19a34f/?dl=1' -O 'models/vqgan_gumbel_f8/configs/model.yaml' 
 mkdir -p models/vqgan_gumbel_f8/checkpoints && wget 'https://heibox.uni-heidelberg.de/f/34a747d5765840b5a99d/?dl=1' -O 'models/vqgan_gumbel_f8/checkpoints/last.ckpt' 
 
-# (optional) for the 128x128 dvae model
-mkdir -p models/dvae/ && wget 'https://dall-3.com/models/dvae/vae-final-128-8192.pt' -O 'models/dvae/vae-final-128-8192.pt' 
+# download latest diffusion model
+wget https://dall-3.com/models/guided-diffusion/256/model-latest.pt -O 'models/model-latest.pt'
 
-# (optional) for the 64x64 classifier model
-mkdir -p models/dvae/ && wget 'https://dall-3.com/models/dvae/vae-classifier.pt' -O 'models/dvae/vae-classifier.pt' 
+# run diffusion (input can be image or npy file - a .npy file should contain the image embeddings)
+python sample.py --model_size 256 --input 0.npy --text "your prompt here"
 
-# download the appropriate diffusion model and put in ./models/
-
-# edit configs in sample.py or super_res.py
-
-python sample.py
-python super_res.py
 ```
 
 # Training

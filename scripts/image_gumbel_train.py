@@ -108,6 +108,7 @@ def load_data_custom(vae, data_dir, batch_size, image_size, class_cond=False):
     )
     for large_batch, model_kwargs in data:
         arr_tens = model_kwargs["image_128"].to(dist_util.dev())
+        arr_tens = (2 * arr_tens) - 1
         image_embeds, _, [_, _, indices] = vae.model.encode(arr_tens)
         model_kwargs["image_embeds"] = image_embeds.detach().cpu()
 

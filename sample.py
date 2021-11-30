@@ -23,25 +23,69 @@ from dalle_pytorch import DiscreteVAE, VQGanVAE
 from einops import rearrange
 from math import log2, sqrt
 
-# configs
+import argparse
 
-model_name = '256'          # 256, 128, or 64
-model_path = 'models/model064000.pt'
-vae_path = './models/vqgan_gumbel_f8/checkpoints/last.ckpt'
-vae_config_path = './models/vqgan_gumbel_f8/configs/model.yaml'
-dvae_mode = False
-prompts = ['Your prompt here']
-image_prompts = []
-batch_size = 1
-clip_guidance = True        # Set to False for no clip guidance
-clip_guidance_scale = 1000  # Controls how much the image should look like the prompt.
-tv_scale = 0                # Controls the smoothness of the final output
-range_scale = 0             # Controls how far out of range RGB values are allowed to be
-cutn = 16
-n_batches = 1
-init_image = 'init.jpg'     # This can be an URL or local path
-seed = 0
-stop_at = 1000              # The last few iterations have a tendency to add spurious detail. Stopping early (at 800 to 900 steps) can help improve image quality, but will give the final result an air brushed look
+# argument parsing
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--model_size', type = str, required = True,
+                    help='256, 128 or 64')
+
+parser.add_argument('--model_path', type=str, default = './models/model-latest.pt',
+                   help='path to the diffusion model')
+
+parser.add_argument('--vae_path', type=str, default = './models/vqgan_gumbel_f8/checkpoints/last.ckpt',
+                   help='path to the vae or vqgan model')
+
+parser.add_argument('--vqgan_config_path', type=str, default = './models/vqgan_gumbel_f8/configs/model.yaml',
+                   help='path to your trained VQGAN config. This should be a .yaml file')
+
+parser.add_argument('--text', type = str, required = True,
+                    help='your text prompt, separate with | characters')
+
+parser.add_argument('--image_prompts', type = str, required = False,
+                    help='image prompts, separate with | characters')
+
+parser.add_argument('--num_batches', type = int, default = 1, required = False,
+                    help='number of batches')
+
+parser.add_argument('--batch_size', type = int, default = 1, required = False,
+                    help='batch size')
+
+parser.add_argument('--clip_guidance_scale', type = int, default = 1000, required = False,
+                    help='Controls how much the image should look like the prompt')
+
+parser.add_argument('--tv_scale', type = int, default = 0, required = False,
+                    help='Controls the smoothness of the final output')
+
+parser.add_argument('--range_scale', type = int, default = 0, required = False,
+                    help='Controls how far out of range RGB values are allowed to be')
+
+parser.add_argument('--cutn', type = int, default = 16, required = False,
+                    help='Number of cuts')
+
+parser.add_argument('--input', type = str, required = True,
+                    help='an input image or an npy file containing embeddings')
+
+parser.add_argument('--seed', type = int, default=0, required = False,
+                    help='an input image or an npy file containing embeddings')
+
+parser.add_argument('--stop_at', type = int, default=1000, required = False,
+                    help='stopping early can give your images an airbrushed look')
+
+parser.add_argument('--dvae_mode', dest='dvae_mode', action='store_true')
+
+parser.add_argument('--clip_guidance', dest='clip_guidance', action='store_true')
+
+args = parser.parse_args()
+
+prompts = args.text.split('|')
+
+if args.image_prompts is not None:
+    image_prompts = args.image_prompts.split('|')
+else:
+    image_prompts = []
 
 def fetch(url_or_path):
     if str(url_or_path).startswith('http://') or str(url_or_path).startswith('https://'):
@@ -160,7 +204,7 @@ model_params = {
 }
 
 model_config = model_and_diffusion_defaults()
-model_config.update(model_params[model_name])
+model_config.update(model_params[args.model_size])
 
 # Load models
 
@@ -168,7 +212,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 
 model, diffusion = create_model_and_diffusion(**model_config)
-model.load_state_dict(torch.load(model_path, map_location='cpu'))
+model.load_state_dict(torch.load(args.model_path, map_location='cpu'))
 model.requires_grad_(False).eval().to(device)
 
 for name, param in model.named_parameters():
@@ -182,15 +226,15 @@ def set_requires_grad(model, value):
     for param in model.parameters():
         param.requires_grad = value
 
-if dvae_mode:
-    loaded_obj = torch.load(vae_path)
+if args.dvae_mode:
+    loaded_obj = torch.load(args.vae_path)
 
     vae_params, vae_weights = loaded_obj['hparams'], loaded_obj['weights']
 
     vae = DiscreteVAE(**vae_params)
     vae.load_state_dict(vae_weights)
 else:
-    vae = VQGanVAE(vae_path, vae_config_path)
+    vae = VQGanVAE(args.vae_path, args.vqgan_config_path)
 
 vae = vae.to(device)
 set_requires_grad(vae, False) # freeze VAE from being trained
@@ -205,10 +249,10 @@ lpips_model = lpips.LPIPS(net='vgg').to(device)
 
 
 def do_run():
-    if seed is not None:
-        torch.manual_seed(seed)
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
 
-    make_cutouts = MakeCutouts(clip_size, cutn)
+    make_cutouts = MakeCutouts(clip_size, args.cutn)
     side_x = side_y = model_config['image_size']
 
     target_embeds, weights = [], []
@@ -225,7 +269,7 @@ def do_run():
         batch = make_cutouts(TF.to_tensor(img).unsqueeze(0).to(device))
         embed = clip_model.encode_image(normalize(batch)).float()
         target_embeds.append(embed)
-        weights.extend([weight / cutn] * cutn)
+        weights.extend([weight / args.cutn] * args.cutn)
 
     target_embeds = torch.cat(target_embeds)
     weights = torch.tensor(weights, device=device)
@@ -233,39 +277,58 @@ def do_run():
         raise RuntimeError('The weights must not sum to 0.')
     weights /= weights.sum().abs()
 
-    init = Image.open(fetch(init_image)).convert('RGB')
-    width, height = init.size   # Get dimensions
+    if args.input.endswith('npy'):
+        with open(args.input, 'rb') as f:
+            img_seq = np.load(f)
 
-    # crop square
-    if width == 128 and height == 128:
-        init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
-    else:
-        if width > height:
-            new_width = height
-            new_height = height
+        img_seq = torch.from_numpy(img_seq).to(device).unsqueeze(0)
+
+        if args.dvae_mode:
+            embeds = vae.codebook(img_seq)
+            b, n, d = embeds.shape
+            h = w = int(sqrt(n))
+
+            embeds = rearrange(embeds, 'b (h w) d -> b d h w', h = h, w = w)
         else:
-            new_width = width
-            new_height = width
-        left = (width - new_width)/2
-        top = (height - new_height)/2
-        right = (width + new_width)/2
-        bottom = (height + new_height)/2
-        init = init.crop((left, top, right, bottom))
+            b, n = img_seq.shape
+            one_hot_indices = F.one_hot(img_seq, num_classes = vae.num_tokens).float()
+            embeds = one_hot_indices @ vae.model.quantize.embed.weight
 
-        init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
-        init_tensor = F.interpolate(init_tensor, size=128, mode='area')
-        
-
-    if dvae_mode:
-        img_seq = vae.get_codebook_indices(init_tensor)
-        image_embeds = vae.codebook(img_seq)
-        b, n, d = image_embeds.shape
-        h = w = int(math.sqrt(n))
-        embeds = rearrange(image_embeds, 'b (h w) d -> b d h w', h = h, w = w).detach()
+            embeds = rearrange(embeds, 'b (h w) c -> b c h w', h = int(sqrt(n)))
     else:
-        embeds, _, [_, _, _] = vae.model.encode(init_tensor)
+        init = Image.open(fetch(args.input)).convert('RGB')
+        width, height = init.size   # Get dimensions
 
-    embeds = embeds.repeat(batch_size, 1, 1, 1)
+        # crop square
+        if width == 128 and height == 128:
+            init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
+        else:
+            if width > height:
+                new_width = height
+                new_height = height
+            else:
+                new_width = width
+                new_height = width
+            left = (width - new_width)/2
+            top = (height - new_height)/2
+            right = (width + new_width)/2
+            bottom = (height + new_height)/2
+            init = init.crop((left, top, right, bottom))
+
+            init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
+            init_tensor = F.interpolate(init_tensor, size=128, mode='area')
+
+        if args.dvae_mode:
+            img_seq = vae.get_codebook_indices(init_tensor)
+            image_embeds = vae.codebook(img_seq)
+            b, n, d = image_embeds.shape
+            h = w = int(math.sqrt(n))
+            embeds = rearrange(image_embeds, 'b (h w) d -> b d h w', h = h, w = w).detach()
+        else:
+            init_tensor = (2 * init_tensor) - 1
+            embeds, _, [_, _, _] = vae.model.encode(init_tensor)
+
+    embeds = embeds.repeat(args.batch_size, 1, 1, 1)
 
     cur_t = None
 
@@ -283,11 +346,11 @@ def do_run():
             clip_in = normalize(make_cutouts(x_in.add(1).div(2)))
             clip_embeds = clip_model.encode_image(clip_in).float()
             dists = spherical_dist_loss(clip_embeds.unsqueeze(1), target_embeds.unsqueeze(0))
-            dists = dists.view([cutn, n, -1])
+            dists = dists.view([args.cutn, n, -1])
             losses = dists.mul(weights).sum(2).mean(0)
             tv_losses = tv_loss(x_in)
             range_losses = range_loss(out['pred_xstart'])
-            loss = losses.sum() * clip_guidance_scale + tv_losses.sum() * tv_scale + range_losses.sum() * range_scale
+            loss = losses.sum() * args.clip_guidance_scale + tv_losses.sum() * args.tv_scale + range_losses.sum() * args.range_scale
             return -torch.autograd.grad(loss, x)[0]
 
     if model_config['timestep_respacing'].startswith('ddim'):
@@ -295,28 +358,28 @@ def do_run():
     else:
         sample_fn = diffusion.p_sample_loop_progressive
 
-    for i in range(n_batches):
+    for i in range(args.num_batches):
         cur_t = diffusion.num_timesteps - 1
 
         samples = sample_fn(
             model,
-            (batch_size, 3, side_y, side_x),
+            (args.batch_size, 3, side_y, side_x),
             clip_denoised=False,
             model_kwargs={'image_embeds': embeds},
-            cond_fn=cond_fn if clip_guidance else None,
+            cond_fn=cond_fn if args.clip_guidance else None,
             progress=True,
         )
 
         for j, sample in enumerate(samples):
             cur_t -= 1
 
-            if j % 50 == 0 or cur_t == -1 or j > stop_at:
+            if j % 50 == 0 or cur_t == -1 or j == 999 or j > args.stop_at:
                 for k, image in enumerate(sample['pred_xstart']):
-                    filename = f'progress_{i * batch_size + k:05}.png'
+                    filename = f'progress_{i * args.batch_size + k:05}.png'
                     pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
                     pimg.save(filename)
 
-            if j > stop_at:
+            if j > args.stop_at:
                 break
 
 gc.collect()

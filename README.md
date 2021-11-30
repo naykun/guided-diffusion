@@ -21,13 +21,13 @@ reconstruction from 256x16x16 latents (best out of 8)
 | <img src="./images/3-ground.png"></img> | <img src="./images/3-gumbel.png"></img> | <img src="./images/3-ccgd-noclip.png"></img> | <img src="./images/3-ccgd-clip-1.png"></img> | <img src="./images/3-ccgd-clip-2.png"></img> | <img src="./images/3-ccgd-clip-3.png"></img> |
 | &nbsp; | &nbsp; | &nbsp; | <sub>Prompt: a cute dog</sub> | <sub>Prompt: a vicious wolf</sub> | <sub>Prompt: a cat </sub> |
 
-superresolution from 64x64 to 256x256
+it can also be used to "clean up" images created by other VAE models
 
-| Ground truth | 64x64 | Upscaled |
-| --- | --- | --- |
-| <img src="./images/1-ground.png"></img> | <img src="./images/1-64x64.png"></img> | <img src="./images/1-upscaled.png"></img> |
-| <img src="./images/2-ground.png"></img> | <img src="./images/2-64x64.png"></img> | <img src="./images/2-upscaled.png"></img> |
-| <img src="./images/3-ground.png"></img> | <img src="./images/3-64x64.png"></img> | <img src="./images/3-upscaled.png"></img> |
+| OpenAI VAE (32x32 latent) | CCGD re-generated | VQGAN f16 16k (16x16 latent) | CCGD re-generated | VQGAN f16 1k (16x16 latent) | CCGD re-generated |
+| --- | --- | --- | --- | --- | --- |
+| <img src="./images/girl-openai.png"></img> | <img src="./images/girl-openai-alt.png"></img> | <img src="./images/girl-16k.png"></img> | <img src="./images/girl-16k-alt.png"></img> | <img src="./images/girl-1k.png"></img> | <img src="./images/girl-1k-alt.png"></img> |
+| <img src="./images/squirrel-openai.png"></img> | <img src="./images/squirrel-openai-alt.png"></img> | <img src="./images/squirrel-16k.png"></img> | <img src="./images/squirrel-16k-alt.png"></img> | <img src="./images/squirrel-1k.png"></img> | <img src="./images/squirrel-1k-alt.png"></img> |
+| <img src="./images/penguin-openai.png"></img> | <img src="./images/penguin-openai-alt.png"></img> | <img src="./images/penguin-16k.png"></img> | <img src="./images/penguin-16k-alt.png"></img> | <img src="./images/penguin-1k.png"></img> | <img src="./images/penguin-1k-alt.png"></img> |
 
 # Download models
 

@@ -69,6 +69,7 @@ python super_res.py --output_size 1024 --input input.png
 # Sampling from ru-dalle tokens
 ```
 # ru-dalle diffusion (input can be image or npy file - a .npy file should contain the image tokens from ru-dalle. This needs ru-dalle to be installed)
+mkdir -p models
 wget https://dall-3.com/models/guided-diffusion/ru-dalle/model-ru-latest.pt -O 'models/model-ru-latest.pt'
 python ru.py --input 0.npy
 

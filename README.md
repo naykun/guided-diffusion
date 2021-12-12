@@ -45,10 +45,9 @@ then clone this repository and
 pip install -e .
 ```
 
-# Sampling from pre-trained models
+# Sampling from dall-3 models
 
 To sample from these models, you can use the `sample.py`, and `super_res.py` scripts in the root directory.
-
 
 ```
 # first download the GumbelVQ model
@@ -64,6 +63,15 @@ python sample.py --model_size 256 --input 0.npy --text "your prompt here"
 # 4x super resolution to 1024px
 wget https://dall-3.com/models/guided-diffusion/64_256/model016000.pt -O 'models/model-super-res.pt'
 python super_res.py --output_size 1024 --input input.png
+
+```
+
+# Sampling from ru-dalle tokens
+```
+# ru-dalle diffusion (input can be image or npy file - a .npy file should contain the image tokens from ru-dalle. This needs ru-dalle to be installed)
+wget https://dall-3.com/models/guided-diffusion/ru-dalle/model-ru-latest.pt -O 'models/model-ru-latest.pt'
+python ru.py --input 0.npy
+
 ```
 
 # Training

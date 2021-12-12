@@ -52,7 +52,7 @@ parser.add_argument('--tv_scale', type = int, default = 0, required = False,
 parser.add_argument('--range_scale', type = int, default = 0, required = False,
                     help='Controls how far out of range RGB values are allowed to be')
 
-parser.add_argument('--cutn', type = int, default = 16, required = False,
+parser.add_argument('--cutn', type = int, default = 48, required = False,
                     help='Number of cuts')
 
 parser.add_argument('--input', type = str, required = True,

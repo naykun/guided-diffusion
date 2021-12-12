@@ -60,6 +60,8 @@ def model_and_diffusion_defaults():
         use_fp16=False,
         use_new_attention_order=False,
         emb_condition=False,
+        emb_input_dims=256,
+        emb_output_dims=512,
     )
     res.update(diffusion_defaults())
     return res
@@ -96,6 +98,8 @@ def create_model_and_diffusion(
     use_fp16,
     use_new_attention_order,
     emb_condition=False,
+    emb_input_dims=256,
+    emb_output_dims=512
 ):
     model = create_model(
         image_size,
@@ -115,6 +119,8 @@ def create_model_and_diffusion(
         use_fp16=use_fp16,
         use_new_attention_order=use_new_attention_order,
         emb_condition=emb_condition,
+        emb_input_dims=emb_input_dims,
+        emb_output_dims=emb_output_dims
     )
     diffusion = create_gaussian_diffusion(
         steps=diffusion_steps,
@@ -147,6 +153,8 @@ def create_model(
     use_fp16=False,
     use_new_attention_order=False,
     emb_condition=False,
+    emb_input_dims=256,
+    emb_output_dims=512,
 ):
     if channel_mult == "":
         if image_size == 512:
@@ -187,6 +195,8 @@ def create_model(
         resblock_updown=resblock_updown,
         use_new_attention_order=use_new_attention_order,
         emb_condition=emb_condition,
+        emb_input_dims=emb_input_dims,
+        emb_output_dims=emb_output_dims,
     )
 
 

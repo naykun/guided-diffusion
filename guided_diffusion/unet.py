@@ -445,6 +445,8 @@ class UNetModel(nn.Module):
         resblock_updown=False,
         use_new_attention_order=False,
         emb_condition=False,
+        emb_input_dims=256,
+        emb_output_dims=512,
     ):
         super().__init__()
 
@@ -467,6 +469,8 @@ class UNetModel(nn.Module):
         self.num_head_channels = num_head_channels
         self.num_heads_upsample = num_heads_upsample
         self.emb_condition = emb_condition
+        self.emb_input_dims = emb_input_dims
+        self.emb_output_dims = emb_output_dims
 
         time_embed_dim = model_channels * 4
         self.time_embed = nn.Sequential(
@@ -544,9 +548,9 @@ class UNetModel(nn.Module):
 
         if self.emb_condition:
             self.external_block = Downsample(
-                256, True, out_channels=512
+                self.emb_input_dims, True, out_channels=self.emb_output_dims
             )
-            middle_ch = ch+512
+            middle_ch = ch+self.emb_output_dims
         else:
             middle_ch = ch
 

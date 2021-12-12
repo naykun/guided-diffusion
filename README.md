@@ -61,6 +61,9 @@ wget https://dall-3.com/models/guided-diffusion/256/model-latest.pt -O 'models/m
 # run diffusion (input can be image or npy file - a .npy file should contain the image tokens)
 python sample.py --model_size 256 --input 0.npy --text "your prompt here"
 
+# 4x super resolution to 1024px
+wget https://dall-3.com/models/guided-diffusion/64_256/model016000.pt -O 'models/model-super-res.pt'
+python super_res.py --output_size 1024 --input input.png
 ```
 
 # Training

@@ -3,7 +3,6 @@ import io
 import math
 import sys
 
-import lpips
 from PIL import Image
 import requests
 import torch
@@ -244,9 +243,6 @@ clip_model.eval().requires_grad_(False).to(device)
 clip_size = clip_model.visual.input_resolution
 
 normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
-
-lpips_model = lpips.LPIPS(net='vgg').to(device)
-
 
 def do_run():
     if args.seed is not None:

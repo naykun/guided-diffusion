@@ -3,7 +3,6 @@ import io
 import math
 import sys
 
-import lpips
 from PIL import Image
 import requests
 import torch
@@ -19,21 +18,67 @@ import clip
 from guided_diffusion.script_util import sr_create_model_and_diffusion, sr_model_and_diffusion_defaults
 
 from einops import rearrange
-from math import log2, sqrt
+from math import log2, sqrt, floor
 
-model_path = './models/model012000.pt'
-prompts = ['your prompt here']
-image_prompts = []
-batch_size = 1
-clip_guidance = False       # Clip guidance typically does not have much effect for the super resolution model
-clip_guidance_scale = 1000  # Controls how much the image should look like the prompt.
-tv_scale = 0                # Controls the smoothness of the final output
-range_scale = 0             # Controls how far out of range RGB values are allowed to be
-cutn = 16
-n_batches = 1
-init_image = 'init.jpg'     # This can be an URL or local path
-seed = 0
-stop_at = 1000              # The last few iterations have a tendency to add spurious detail. Stopping early (at 800 to 900 steps) can help improve image quality, but will give the final result an air brushed look
+import argparse
+
+# argument parsing
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--output_size', type = int, default = 512, required = False,
+                    help='size of the output image (any multiple of 32)')
+
+parser.add_argument('--input', type = str, required = True,
+                    help='path to an input image')
+
+parser.add_argument('--model_path', type=str, default = './models/model-super-res.pt', required=False,
+                   help='path to the diffusion model')
+
+parser.add_argument('--text', type = str, required = False,
+                    help='your text prompt, separate with | characters')
+
+parser.add_argument('--image_prompts', type = str, required = False,
+                    help='image prompts, separate with | characters')
+
+parser.add_argument('--num_batches', type = int, default = 1, required = False,
+                    help='number of batches')
+
+parser.add_argument('--batch_size', type = int, default = 1, required = False,
+                    help='batch size')
+
+parser.add_argument('--clip_guidance_scale', type = int, default = 1000, required = False,
+                    help='Controls how much the image should look like the prompt')
+
+parser.add_argument('--tv_scale', type = int, default = 0, required = False,
+                    help='Controls the smoothness of the final output')
+
+parser.add_argument('--range_scale', type = int, default = 0, required = False,
+                    help='Controls how far out of range RGB values are allowed to be')
+
+parser.add_argument('--cutn', type = int, default = 16, required = False,
+                    help='Number of cuts')
+
+parser.add_argument('--seed', type = int, default=0, required = False,
+                    help='random seed')
+
+parser.add_argument('--stop_at', type = int, default=1000, required = False,
+                    help='stopping early can give your images an airbrushed look')
+
+parser.add_argument('--clip_guidance', dest='clip_guidance', action='store_true')
+
+
+args = parser.parse_args()
+
+if args.text is not None:
+    prompts = args.text.split('|')
+else:
+    prompts = []
+
+if args.image_prompts is not None:
+    image_prompts = args.image_prompts.split('|')
+else:
+    image_prompts = []
 
 def fetch(url_or_path):
     if str(url_or_path).startswith('http://') or str(url_or_path).startswith('https://'):
@@ -119,7 +164,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 
 model, diffusion = sr_create_model_and_diffusion(**model_config)
-model.load_state_dict(torch.load(model_path, map_location='cpu'))
+model.load_state_dict(torch.load(args.model_path, map_location='cpu'))
 model.requires_grad_(False).eval().to(device)
 
 for name, param in model.named_parameters():
@@ -129,21 +174,22 @@ for name, param in model.named_parameters():
 if model_config['use_fp16']:
     model.convert_to_fp16()
 
-clip_model, clip_preprocess = clip.load('ViT-B/16', jit=False)
-clip_model.eval().requires_grad_(False).to(device)
-clip_size = clip_model.visual.input_resolution
+if args.clip_guidance:
+    clip_model, clip_preprocess = clip.load('ViT-B/16', jit=False)
+    clip_model.eval().requires_grad_(False).to(device)
+    clip_size = clip_model.visual.input_resolution
 
-normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
+    normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
                                  std=[0.26862954, 0.26130258, 0.27577711])
 
-lpips_model = lpips.LPIPS(net='vgg').to(device)
-
 def do_run():
-    if seed is not None:
-        torch.manual_seed(seed)
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
 
-    make_cutouts = MakeCutouts(clip_size, cutn)
-    side_x = side_y = model_config['large_size']
+    if args.clip_guidance:
+        make_cutouts = MakeCutouts(clip_size, args.cutn)
+
+    side_x = side_y = args.output_size
 
     target_embeds, weights = [], []
 
@@ -159,19 +205,24 @@ def do_run():
         batch = make_cutouts(TF.to_tensor(img).unsqueeze(0).to(device))
         embed = clip_model.encode_image(normalize(batch)).float()
         target_embeds.append(embed)
-        weights.extend([weight / cutn] * cutn)
+        weights.extend([weight / args.cutn] * args.cutn)
 
-    target_embeds = torch.cat(target_embeds)
-    weights = torch.tensor(weights, device=device)
-    if weights.sum().abs() < 1e-3:
-        raise RuntimeError('The weights must not sum to 0.')
-    weights /= weights.sum().abs()
+    if args.clip_guidance:
+        target_embeds = torch.cat(target_embeds)
+        weights = torch.tensor(weights, device=device)
+        if weights.sum().abs() < 1e-3:
+            raise RuntimeError('The weights must not sum to 0.')
+        weights /= weights.sum().abs()
 
-    init = Image.open(fetch(init_image)).convert('RGB')
+    init = Image.open(fetch(args.input)).convert('RGB')
     width, height = init.size   # Get dimensions
 
+    input_size = floor(args.output_size/4)
+
+    print('sizes', input_size, args.output_size)
+
     # crop square
-    if width != 64 or height != 64:
+    if width != input_size or height != input_size:
         if width > height:
             new_width = height
             new_height = height
@@ -185,10 +236,10 @@ def do_run():
         init = init.crop((left, top, right, bottom))
 
     init_tensor = transforms.ToTensor()(init).unsqueeze(0)
-    init_tensor = F.interpolate(init_tensor, size=64, mode='area') # this specific downscaling method was used during training and is necessary for best results
+    init_tensor = F.interpolate(init_tensor, size=input_size, mode='area') # this specific downscaling method was used during training and is necessary for best results
     init_tensor = init_tensor.to(device).mul(2).sub(1).clamp(-1,1)
 
-    init_tensor = init_tensor.repeat(batch_size, 1, 1, 1)
+    init_tensor = init_tensor.repeat(args.batch_size, 1, 1, 1)
 
     cur_t = None
 
@@ -206,11 +257,11 @@ def do_run():
             clip_in = normalize(make_cutouts(x_in.add(1).div(2)))
             clip_embeds = clip_model.encode_image(clip_in).float()
             dists = spherical_dist_loss(clip_embeds.unsqueeze(1), target_embeds.unsqueeze(0))
-            dists = dists.view([cutn, n, -1])
+            dists = dists.view([args.cutn, n, -1])
             losses = dists.mul(weights).sum(2).mean(0)
             tv_losses = tv_loss(x_in)
             range_losses = range_loss(out['pred_xstart'])
-            loss = losses.sum() * clip_guidance_scale + tv_losses.sum() * tv_scale + range_losses.sum() * range_scale
+            loss = losses.sum() * args.clip_guidance_scale + tv_losses.sum() * args.tv_scale + range_losses.sum() * args.range_scale
             return -torch.autograd.grad(loss, x)[0]
 
     if model_config['timestep_respacing'].startswith('ddim'):
@@ -218,27 +269,27 @@ def do_run():
     else:
         sample_fn = diffusion.p_sample_loop_progressive
 
-    for i in range(n_batches):
+    for i in range(args.num_batches):
         cur_t = diffusion.num_timesteps - 1
 
         samples = sample_fn(
             model,
-            (batch_size, 3, side_y, side_x),
+            (args.batch_size, 3, side_y, side_x),
             clip_denoised=False,
             model_kwargs={'low_res': init_tensor},
-            cond_fn=cond_fn if clip_guidance else None,
+            cond_fn=cond_fn if args.clip_guidance else None,
             progress=True,
         )
 
         for j, sample in enumerate(samples):
             cur_t -= 1
-            if j % 50 == 0 or cur_t == -1 or j > stop_at:
+            if j % 50 == 0 or cur_t == -1 or j == 999 or j > args.stop_at:
                 for k, image in enumerate(sample['pred_xstart']):
-                    filename = f'progress_{i * batch_size + k:05}.png'
+                    filename = f'progress_{i * args.batch_size + k:05}.png'
                     pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
                     pimg.save(filename)
 
-            if j > stop_at:
+            if j > args.stop_at:
                 break
 
 gc.collect()

@@ -2,7 +2,7 @@
 
 This project is based on Clip-Guided Diffusion by [RiversHaveWings](https://twitter.com/RiversHaveWings)
 
-This diffusion model is ultimately meant for image generation via [DALLE-pytorch](https://github.com/lucidrains/DALLE-pytorch/) by replacing the VAE decoder. By itself, it can perform text-guided image-to-image translation. In this application the overall structure of the original image is preserved, while the details are re-generated with clip guidance. This repository also contains a separate model for clip-guided super-resolution from 64x64 to 256x256
+With minor architectural changes to the DDPM model it's possible to generate images conditioned on VQ embeddings. This DDPM model can replace the decoder of any transformer model that currently uses VQVAE or VQGAN, yielding about a one scale-factor improvement in image quality. Pretrained models for DALLE-pytorch and Ru-DALLE are provided.
 
 more details at this [github discussion](https://github.com/lucidrains/DALLE-pytorch/discussions/375)
 

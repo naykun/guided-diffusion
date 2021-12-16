@@ -58,6 +58,9 @@ parser.add_argument('--cutn', type = int, default = 48, required = False,
 parser.add_argument('--input', type = str, required = True,
                     help='an input image or an npy file containing image tokens')
 
+parser.add_argument('--output_size', type = int, default = 512, required = False,
+                    help='image size of output (only used for image input, not token input)')
+
 parser.add_argument('--seed', type = int, default=0, required = False,
                     help='random seed')
 
@@ -65,6 +68,8 @@ parser.add_argument('--stop_at', type = int, default=1000, required = False,
                     help='stopping early can give your images an airbrushed look')
 
 parser.add_argument('--clip_guidance', dest='clip_guidance', action='store_true')
+
+parser.add_argument('--cpu', dest='cpu', action='store_true')
 
 args = parser.parse_args()
 
@@ -100,7 +105,6 @@ def parse_prompt(prompt):
 class MakeCutouts(nn.Module):
     def __init__(self, cut_size, cutn, cut_pow=1.):
         super().__init__()
-        print(cut_size)
         self.cut_size = cut_size
         self.cutn = cutn
         self.cut_pow = cut_pow
@@ -156,9 +160,12 @@ model_config.update({
     'emb_condition': True
 })
 
+if args.cpu:
+    model_config['use_fp16'] = False
+
 # Load models
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if (torch.cuda.is_available() and not args.cpu) else 'cpu')
 print('Using device:', device)
 
 model, diffusion = create_model_and_diffusion(**model_config)
@@ -171,6 +178,8 @@ for name, param in model.named_parameters():
 
 if model_config['use_fp16']:
     model.convert_to_fp16()
+elif args.cpu:
+    model.convert_to_fp32()
 
 def set_requires_grad(model, value):
     for param in model.parameters():
@@ -196,7 +205,10 @@ def do_run():
     if args.clip_guidance:
         make_cutouts = MakeCutouts(clip_size, args.cutn)
 
-    side_x = side_y = 512
+    if args.output_size:
+        side_x = side_y = args.output_size
+    else:
+        side_x = side_y = 512
 
     target_embeds, weights = [], []
 
@@ -237,7 +249,8 @@ def do_run():
         width, height = init.size   # Get dimensions
 
         # crop square
-        if width == 256 and height == 256:
+        input_size = int(args.output_size/2)
+        if width == input_size and height == input_size:
             init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
         else:
             if width > height:
@@ -253,7 +266,7 @@ def do_run():
             init = init.crop((left, top, right, bottom))
 
             init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
-            init_tensor = F.interpolate(init_tensor, size=256, mode='area')
+            init_tensor = F.interpolate(init_tensor, size=input_size, mode='area')
 
         img_seq = vae.get_codebook_indices(init_tensor)
         b, n = img_seq.shape
@@ -308,7 +321,7 @@ def do_run():
 
             if j % 50 == 0 or cur_t == -1 or j == 999 or j > args.stop_at:
                 for k, image in enumerate(sample['pred_xstart']):
-                    filename = f'progress_{i * args.batch_size + k:05}.png'
+                    filename = f'{args.input}_progress_{i * args.batch_size + k:05}.png'
                     pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
                     pimg.save(filename)
 

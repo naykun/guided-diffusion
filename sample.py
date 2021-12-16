@@ -40,7 +40,7 @@ parser.add_argument('--vae_path', type=str, default = './models/vqgan_gumbel_f8/
 parser.add_argument('--vqgan_config_path', type=str, default = './models/vqgan_gumbel_f8/configs/model.yaml',
                    help='path to your trained VQGAN config. This should be a .yaml file')
 
-parser.add_argument('--text', type = str, required = True,
+parser.add_argument('--text', type = str, required = False,
                     help='your text prompt, separate with | characters')
 
 parser.add_argument('--image_prompts', type = str, required = False,
@@ -67,6 +67,9 @@ parser.add_argument('--cutn', type = int, default = 16, required = False,
 parser.add_argument('--input', type = str, required = True,
                     help='an input image or an npy file containing image tokens')
 
+parser.add_argument('--output_size', type = int, default = 256, required = False,
+                    help='image size of output (only used for image input, not token input)')
+
 parser.add_argument('--seed', type = int, default=0, required = False,
                     help='random seed')
 
@@ -77,9 +80,14 @@ parser.add_argument('--dvae_mode', dest='dvae_mode', action='store_true')
 
 parser.add_argument('--clip_guidance', dest='clip_guidance', action='store_true')
 
+parser.add_argument('--cpu', dest='cpu', action='store_true')
+
 args = parser.parse_args()
 
-prompts = args.text.split('|')
+if args.text is not None:
+    prompts = args.text.split('|')
+else:
+    prompts = []
 
 if args.image_prompts is not None:
     image_prompts = args.image_prompts.split('|')
@@ -108,7 +116,7 @@ def parse_prompt(prompt):
 class MakeCutouts(nn.Module):
     def __init__(self, cut_size, cutn, cut_pow=1.):
         super().__init__()
-        print(cut_size)
+
         self.cut_size = cut_size
         self.cutn = cutn
         self.cut_pow = cut_pow
@@ -143,6 +151,9 @@ def tv_loss(input):
 
 def range_loss(input):
     return (input - input.clamp(-1, 1)).pow(2).mean([1, 2, 3])
+
+device = torch.device('cuda:0' if (torch.cuda.is_available() and not args.cpu) else 'cpu')
+print('Using device:', device)
 
 model_params = {
     '256' : {
@@ -205,10 +216,10 @@ model_params = {
 model_config = model_and_diffusion_defaults()
 model_config.update(model_params[args.model_size])
 
-# Load models
+if args.cpu:
+    model_config['use_fp16'] = False
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-print('Using device:', device)
+# Load models
 
 model, diffusion = create_model_and_diffusion(**model_config)
 model.load_state_dict(torch.load(args.model_path, map_location='cpu'))
@@ -220,6 +231,8 @@ for name, param in model.named_parameters():
 
 if model_config['use_fp16']:
     model.convert_to_fp16()
+elif args.cpu:
+    model.convert_to_fp32()
 
 def set_requires_grad(model, value):
     for param in model.parameters():
@@ -238,18 +251,24 @@ else:
 vae = vae.to(device)
 set_requires_grad(vae, False) # freeze VAE from being trained
 
-clip_model, clip_preprocess = clip.load('ViT-B/16', jit=False)
-clip_model.eval().requires_grad_(False).to(device)
-clip_size = clip_model.visual.input_resolution
+if args.clip_guidance:
+    clip_model, clip_preprocess = clip.load('ViT-B/16', jit=False)
+    clip_model.eval().requires_grad_(False).to(device)
+    clip_size = clip_model.visual.input_resolution
 
-normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
+    normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
 
 def do_run():
     if args.seed is not None:
         torch.manual_seed(args.seed)
 
-    make_cutouts = MakeCutouts(clip_size, args.cutn)
-    side_x = side_y = model_config['image_size']
+    if args.clip_guidance:
+        make_cutouts = MakeCutouts(clip_size, args.cutn)
+
+    if args.output_size:
+        side_x = side_y = args.output_size
+    else:
+        side_x = side_y = model_config['image_size']
 
     target_embeds, weights = [], []
 
@@ -267,11 +286,12 @@ def do_run():
         target_embeds.append(embed)
         weights.extend([weight / args.cutn] * args.cutn)
 
-    target_embeds = torch.cat(target_embeds)
-    weights = torch.tensor(weights, device=device)
-    if weights.sum().abs() < 1e-3:
-        raise RuntimeError('The weights must not sum to 0.')
-    weights /= weights.sum().abs()
+    if len(prompts) > 0:
+        target_embeds = torch.cat(target_embeds)
+        weights = torch.tensor(weights, device=device)
+        if weights.sum().abs() < 1e-3:
+            raise RuntimeError('The weights must not sum to 0.')
+        weights /= weights.sum().abs()
 
     if args.input.endswith('npy'):
         with open(args.input, 'rb') as f:
@@ -296,7 +316,8 @@ def do_run():
         width, height = init.size   # Get dimensions
 
         # crop square
-        if width == 128 and height == 128:
+        input_size = int(args.output_size/2)
+        if width == input_size and height == input_size:
             init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
         else:
             if width > height:
@@ -312,7 +333,7 @@ def do_run():
             init = init.crop((left, top, right, bottom))
 
             init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
-            init_tensor = F.interpolate(init_tensor, size=128, mode='area')
+            init_tensor = F.interpolate(init_tensor, size=input_size, mode='area')
 
         if args.dvae_mode:
             img_seq = vae.get_codebook_indices(init_tensor)

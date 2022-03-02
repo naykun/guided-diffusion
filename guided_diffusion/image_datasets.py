@@ -133,6 +133,8 @@ class ImageDataset(Dataset):
         if self.emb_condition:
             arr_128 = F.interpolate(torch.from_numpy(arr).unsqueeze(0), 128, mode="area")
             out_dict["image_128"] = arr_128.squeeze(0)
+            arr_256= F.interpolate(torch.from_numpy(arr).unsqueeze(0), 256, mode="area")
+            out_dict["image_256"] = arr_256.squeeze(0)
 
         return arr, out_dict
 

@@ -1,0 +1,2 @@
+CUDA_VISIBLE_DEVICES=8 python sample.py --model_size 256 --input images/2-ground.png --model_path /msrhyper-ddn/hai1/kun/diffusion_runs/256_logs/model132000.pt
+CUDA_VISIBLE_DEVICES=8 python super_res.py --output_size 1024 --input progress_00000.png

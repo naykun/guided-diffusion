@@ -1,3 +1,7 @@
 .DS_Store
 __pycache__/
-
+generated/
+guided_diffusion.egg-info/
+taming/
+models/
+version_6

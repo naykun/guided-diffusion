@@ -285,7 +285,8 @@ def do_run():
             cur_t -= 1
             if j % 50 == 0 or cur_t == -1 or j == 999 or j > args.stop_at:
                 for k, image in enumerate(sample['pred_xstart']):
-                    filename = f'progress_{i * args.batch_size + k:05}.png'
+                    # filename = f'progress_{i * args.batch_size + k:05}.png'
+                    filename = f'{args.input[:-4] + "_hr.png"}'
                     pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
                     pimg.save(filename)
 

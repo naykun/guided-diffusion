@@ -67,6 +67,7 @@ class TrainLoop:
 
         self.sync_cuda = th.cuda.is_available()
 
+        logger.log(f"Start Loading")
         self._load_and_sync_parameters()
         self.mp_trainer = MixedPrecisionTrainer(
             model=self.model,
@@ -109,6 +110,7 @@ class TrainLoop:
                 )
             self.use_ddp = False
             self.ddp_model = self.model
+        logger.log(f"Init Finish")
 
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -117,12 +119,14 @@ class TrainLoop:
             self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
             if dist.get_rank() == 0:
                 logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+                # self.model.load_state_dict(th.load(resume_checkpoint, map_location="cpu"), strict=False)
                 self.model.load_state_dict(
                     dist_util.load_state_dict(
                         resume_checkpoint, map_location=dist_util.dev()
                     ), strict=False
                 )
 
+        logger.log(f"sync param: {resume_checkpoint}...")
         dist_util.sync_params(self.model.parameters())
 
     def _load_ema_parameters(self, rate):
@@ -139,6 +143,7 @@ class TrainLoop:
                 ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
 
         dist_util.sync_params(ema_params)
+        logger.log(f"EMA loaded")
         return ema_params
 
     def _load_optimizer_state(self):

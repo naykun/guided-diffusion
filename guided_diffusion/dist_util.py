@@ -13,7 +13,7 @@ import torch.distributed as dist
 
 # Change this to reflect your cluster layout.
 # The GPU for a given rank is (rank % GPUS_PER_NODE).
-GPUS_PER_NODE = 4
+GPUS_PER_NODE = 16
 
 SETUP_RETRY_COUNT = 3
 
@@ -55,6 +55,7 @@ def load_state_dict(path, **kwargs):
     """
     Load a PyTorch file without redundant fetches across MPI ranks.
     """
+    return th.load(path, **kwargs)
     chunk_size = 2 ** 30  # MPI has a relatively small size limit
     if MPI.COMM_WORLD.Get_rank() == 0:
         with bf.BlobFile(path, "rb") as f:

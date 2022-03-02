@@ -23,7 +23,7 @@ from einops import rearrange
 from math import log2, sqrt
 
 import argparse
-
+import os
 # argument parsing
 
 parser = argparse.ArgumentParser()
@@ -156,6 +156,24 @@ device = torch.device('cuda:0' if (torch.cuda.is_available() and not args.cpu) e
 print('Using device:', device)
 
 model_params = {
+        '256_wide' : {
+        'attention_resolutions': '32, 16, 8',
+        'class_cond': False,
+        'diffusion_steps': 1000,
+        'rescale_timesteps': True,
+        'timestep_respacing': '1000',  # Modify this value to decrease the number of
+                                       # timesteps.
+        'image_size': 256,
+        'learn_sigma': True,
+        'noise_schedule': 'linear',
+        'num_channels': 288,
+        'num_head_channels': 16,
+        'num_res_blocks': 2,
+        'resblock_updown': True,
+        'use_fp16': True,
+        'use_scale_shift_norm': True,
+        'emb_condition': True
+    },
     '256' : {
         'attention_resolutions': '32, 16, 8',
         'class_cond': False,
@@ -246,7 +264,7 @@ if args.dvae_mode:
     vae = DiscreteVAE(**vae_params)
     vae.load_state_dict(vae_weights)
 else:
-    vae = VQGanVAE(args.vae_path, args.vqgan_config_path)
+    vae = VQGanVAE()
 
 vae = vae.to(device)
 set_requires_grad(vae, False) # freeze VAE from being trained
@@ -311,12 +329,31 @@ def do_run():
             embeds = one_hot_indices @ vae.model.quantize.embed.weight
 
             embeds = rearrange(embeds, 'b (h w) c -> b c h w', h = int(sqrt(n)))
+    elif args.input.endswith('res'):
+        res = torch.load(args.input)
+        # import ipdb; ipdb.set_trace()
+        import json
+        # prompts = json.load(open("prompt.json"))[:args.batch_size]
+        img_seq = res["generate"][:,1:].to(device)
+        if args.dvae_mode:
+            embeds = vae.codebook(img_seq)
+            b, n, d = embeds.shape
+            h = w = int(sqrt(n))
+
+            embeds = rearrange(embeds, 'b (h w) d -> b d h w', h = h, w = w)
+        else:
+            b, n = img_seq.shape
+            one_hot_indices = F.one_hot(img_seq, num_classes = vae.num_tokens).float()
+            embeds = one_hot_indices @ vae.model.quantize.embed.weight if vae.is_gumbel \
+            else (one_hot_indices @ vae.model.quantize.embedding.weight)
+
+            embeds = rearrange(embeds, 'b (h w) c -> b c h w', h = int(sqrt(n)))
     else:
         init = Image.open(fetch(args.input)).convert('RGB')
         width, height = init.size   # Get dimensions
 
         # crop square
-        input_size = int(args.output_size/2)
+        input_size = args.output_size
         if width == input_size and height == input_size:
             init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
         else:
@@ -332,8 +369,12 @@ def do_run():
             bottom = (height + new_height)/2
             init = init.crop((left, top, right, bottom))
 
-            init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
+            init = np.array(init)
+            init = init.astype(np.float32) / 127.5 - 1.
+            # init_tensor = transforms.ToTensor()(init).unsqueeze(0).to(device)
+            init_tensor = torch.from_numpy(init).unsqueeze(0).to(device)
             init_tensor = F.interpolate(init_tensor, size=input_size, mode='area')
+
 
         if args.dvae_mode:
             img_seq = vae.get_codebook_indices(init_tensor)
@@ -344,9 +385,11 @@ def do_run():
         else:
             init_tensor = (2 * init_tensor) - 1
             print(init_tensor.shape)
+            img_seq = vae.get_codebook_indices(init_tensor)
             embeds, _, [_, _, _] = vae.model.encode(init_tensor)
 
-    embeds = embeds.repeat(args.batch_size, 1, 1, 1)
+
+    # embeds = embeds.repeat(args.batch_size, 1, 1, 1)
     print(embeds.shape)
     cur_t = None
 
@@ -376,29 +419,43 @@ def do_run():
     else:
         sample_fn = diffusion.p_sample_loop_progressive
 
-    for i in range(args.num_batches):
-        cur_t = diffusion.num_timesteps - 1
+    basedir = os.path.join("generated", args.input)
+    os.makedirs(basedir,exist_ok=True)
+    defused_basedir = os.path.join(basedir,"diffused")
+    os.makedirs(defused_basedir, exist_ok=True)
+    origin_images = vae.decode(img_seq)
+    for k, image in enumerate(origin_images):
+        filename = f'origin_{k:05}.png'
+        filename = os.path.join(basedir, filename)
+        # pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
+        pimg = TF.to_pil_image(image)
+        pimg.save(filename)
+    for sample_id in range(embeds.shape[0]):
+        for i in range(args.num_batches):
+            cur_t = diffusion.num_timesteps - 1
 
-        samples = sample_fn(
-            model,
-            (args.batch_size, 3, side_y, side_x),
-            clip_denoised=False,
-            model_kwargs={'image_embeds': embeds},
-            cond_fn=cond_fn if args.clip_guidance else None,
-            progress=True,
-        )
+            samples = sample_fn(
+                model,
+                (args.batch_size, 3, side_y, side_x),
+                clip_denoised=False,
+                model_kwargs={'image_embeds': embeds[sample_id:sample_id+1]},
+                cond_fn=cond_fn if args.clip_guidance else None,
+                progress=True,
+            )
+            
+            for j, sample in enumerate(samples):
+                cur_t -= 1
 
-        for j, sample in enumerate(samples):
-            cur_t -= 1
+                if j % 50 == 0 or cur_t == -1 or j == 999 or j > args.stop_at:
+                    for k, image in enumerate(sample['pred_xstart']):
+                        filename = f'1024tk_{sample_id}_progress_{i * args.batch_size + k:05}.png'
+                        filename = os.path.join(defused_basedir, filename)
+                        # pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
+                        pimg = TF.to_pil_image(image.clamp(-1, 1).add(1).div(2).mul(255).type(torch.uint8))
+                        pimg.save(filename)
 
-            if j % 50 == 0 or cur_t == -1 or j == 999 or j > args.stop_at:
-                for k, image in enumerate(sample['pred_xstart']):
-                    filename = f'progress_{i * args.batch_size + k:05}.png'
-                    pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
-                    pimg.save(filename)
-
-            if j > args.stop_at:
-                break
+                if j > args.stop_at:
+                    break
 
 gc.collect()
 do_run()

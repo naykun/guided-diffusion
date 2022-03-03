@@ -24,6 +24,10 @@ from math import log2, sqrt
 
 import argparse
 import os
+
+import cv2
+import numpy as np
+from skimage import exposure
 # argument parsing
 
 parser = argparse.ArgumentParser()
@@ -339,7 +343,8 @@ def do_run():
     else:
         sample_fn = diffusion.p_sample_loop
 
-    basedir = os.path.join("/s1_md0/v-kunyan/inf_tmp/generated", *args.input.split("/")[4:7])
+    # basedir = os.path.join("/s1_md0/v-kunyan/inf_tmp/generated", *args.input.split("/")[4:7])
+    basedir = os.path.join("/msrhyper-weka/t-kunyan/inf_tmp/generated/1000-step/", *args.input.split("/")[4:5])
     os.makedirs(basedir,exist_ok=True)
     origin_basedir = os.path.join(basedir,"origin")
     os.makedirs(origin_basedir, exist_ok=True)
@@ -410,37 +415,50 @@ def do_run():
             bs = len(image_ids)
             origin_images = images[-bs:].chunk(bs)
             pred_images = images[:-bs].chunk(bs)
+            num_samples = len(pred_images[0])
 
-            # for k, image in zip(image_ids, origin_images):
-            #     filename = f'{k}.png'
-            #     filename = os.path.join(origin_basedir, filename)
-            #     # pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
-            #     pimg = TF.to_pil_image(image)
-            #     pimg.save(filename)
+            for k, image in zip(image_ids, origin_images):
+                filename = f'{k}.png'
+                filename = os.path.join(origin_basedir, filename)
+                pimg = TF.to_pil_image(image[0].float().add(1).div(2).clamp(0, 1))
+                # pimg = TF.to_pil_image(image[0])
+                pimg.save(filename)
                 
-            # for k, images in zip(image_ids, pred_images):
-            #     for kk, image in enumerate(images):
-            #         filename = f'{k}_{kk}.png'
-            #         filename = os.path.join(gan_basedir, filename)
-            #         # pimg = TF.to_pil_image(image.add(1).div(2).clamp(0, 1))
-            #         pimg = TF.to_pil_image(image)
-            #         pimg.save(filename)    
+            for k, images in zip(image_ids, pred_images):
+                for kk, image in enumerate(images):
+                    filename = f'{k}_{kk}.png'
+                    filename = os.path.join(gan_basedir, filename)
+                    pimg = TF.to_pil_image(image.float().add(1).div(2).clamp(0, 1))
+                    # pimg = TF.to_pil_image(image)
+                    pimg.save(filename)    
                 
-            for sample_id in range(embeds.shape[0]):
-                for i in range(args.num_batches):
-                    cur_t = diffusion.num_timesteps - 1
 
-                    samples = sample_fn(
-                        model,
-                        (args.batch_size, 3, side_y, side_x),
-                        clip_denoised=False,
-                        # model_kwargs={'image_embeds': embeds[sample_id:sample_id+1]},
-                        model_kwargs={'image_embeds': embeds},
-                        cond_fn=cond_fn if args.clip_guidance else None,
-                        progress=True,
-                    )
-                    import ipdb; ipdb.set_trace()
-                    
+
+            cur_t = diffusion.num_timesteps - 1
+
+            samples = sample_fn(
+                model,
+                (args.batch_size, 3, side_y, side_x),
+                clip_denoised=False,
+                # model_kwargs={'image_embeds': embeds[sample_id:sample_id+1]},
+                model_kwargs={'image_embeds': embeds},
+                cond_fn=cond_fn if args.clip_guidance else None,
+                progress=True,
+            )
+            # import ipdb; ipdb.set_trace()
+            diffused_image = samples.chunk(bs)
+            for k, images in zip(image_ids, pred_images):
+                for kk, image in enumerate(images):
+                    filename = f'{k}_{kk}.png'
+                    filename = os.path.join(diffused_basedir, filename)
+                    pimg = TF.to_pil_image(image.float().add(1).div(2).clamp(0, 1))
+                    pimg = cv2.cvtColor(np.asarray(pimg), cv2.COLOR_RGB2BGR)
+                    p2, p98 = np.percentile(pimg, (2, 98))
+                    img_rescale = exposure.rescale_intensity(pimg, in_range=(p2, p98))
+                    # import ipdb; ipdb.set_trace()
+                    cv2.imwrite(filename, img_rescale)
+                    # pimg = TF.to_pil_image(image)
+                    # pimg.save(filename)    
                     # for j, sample in enumerate(samples):
                     #     cur_t -= 1
                     #     if j % 50 == 0 or cur_t == -1 or j == 999 or j > args.stop_at:

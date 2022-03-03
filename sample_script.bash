@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=2 python sample.py --model_size "256" --batch_size 2 --clip_guidance --input samples/lightning_logs/version_2/validate_142019.res
